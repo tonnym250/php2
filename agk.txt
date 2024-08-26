@@ -1,0 +1,188 @@
+           index.php
+      -----------------------
+<?php
+
+require("connect.php");
+if($_SERVER["REQUEST_METHOD"]=="POST"){
+
+    $username=isset($_POST["username"])?$_POST["username"]:"";
+    $password=isset($_POST["password"])?$_POST["password"]:"";
+    
+if(empty($username) || empty($password)){
+   echo"username and password is required";
+}
+else{
+    $select=mysqli_query($conn,"SELECT username from elie where username='$username'");
+
+    if(mysqli_num_rows($select)>0){
+        echo"username is already exist";  
+    }
+    else{
+    $insert=mysqli_query($conn,"INSERT into elie (username,password) values('$username','$password')");
+    
+    if($insert){
+        header("location:display.php");
+    }
+    else{
+        echo"please insert data!";
+    }
+ } 
+}  
+
+}
+
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="" method="POST">
+    Username:<input type="text" name="username"><br><br>
+    Password:<input type="text" name="password"><br><br>
+    <button input type="text" name="register">Register</button><br>
+</form>
+</body>
+</html>
+
+
+
+
+
+               connect.php
+            ---------------------
+<?php
+$conn=mysqli_connect("localhost","root","","elie");
+
+?>
+
+
+
+
+
+                         display.php
+                       -------------------
+<?php
+
+require("connect.php");
+
+$select=mysqli_query($conn,"SELECT * from elie");
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>display</title>
+</head>
+<body>
+    <table border="1">
+     <tr>
+      <th>ID no</th>
+      <th>username</th>
+      <th>password</th>
+     </tr>
+   <?php
+   if(mysqli_num_rows($select)>0){
+    $i=1;
+    while($row = mysqli_fetch_assoc($select)){
+
+        echo "
+        
+        <tr>
+        <td>{$i}</td>
+        <td>{$row['username']}</td>
+        <td>{$row['password']}</td>
+        <td>
+        <a href='update.php?id={$row['id']}'>update</a>
+        <a href='delete.php?id={$row['id']}'>delete</a>
+        </td>     
+        </tr>
+        ";
+        $i++;
+    }
+   
+   }
+   ?>
+    </table>
+</body>
+</html>
+
+
+
+
+                      delete.php
+                     ---------------
+<?php
+
+require("connect.php");
+$id=$_GET["id"];
+
+$delete=mysqli_query($conn,"DELETE from elie where id=$id");
+
+?>
+
+
+
+
+
+                             update.php
+                           ---------------
+<?php
+
+require("connect.php");
+
+$id=$_GET['id'];
+
+if(empty($id)){
+header("location:index.php");
+}else{
+
+    if($_SERVER["REQUEST_METHOD"]=="POST"){
+
+        $username=isset($_POST["username"])?$_POST["username"]:"";
+        $password=isset($_POST["password"])?$_POST["password"]:"";
+
+        $update=mysqli_query($conn,"UPDATE elie set username='$username',password='$password' where id=$id");
+        if($update){
+        header("Location:display.php");
+    }else{
+        echo"data is not updated";
+    }
+    
+}
+}
+
+$select=mysqli_query($conn,"SELECT * from elie where id=$id");
+if(mysqli_num_rows($select)>0){
+
+   $row=mysqli_fetch_array($select);
+   $username=$row["username"];
+   $password=$row["password"];
+
+
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]).'?id='.$id;?>" method="POST">
+    Username:<input type="text" name="username" value="<?php echo htmlspecialchars($username)?>"><br><br>
+    Password:<input type="text" name="password" value="<?php echo htmlspecialchars($password)?>"><br><br>
+    <button input type="text" name="update">update</button><br>
+</form>
+</body>
+</html>

@@ -1,0 +1,588 @@
+              login.php
+            -------------
+<?php
+session_start();
+require 'db.php';
+require 'navbar.php';
+
+// Check if the user is already logged in
+if (isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    $rememberMe = isset($_POST['remember_me']);
+
+    $sql = "SELECT * FROM users WHERE username = '$username' and password = '$password'";
+    $result = mysqli_query($conn, $sql);
+
+    if (mysqli_num_rows($result) > 0) {
+        $user = mysqli_fetch_assoc($result);
+
+        $_SESSION['user_id'] = $user['id'];
+
+        // Set a cookie if "Remember Me" is checked
+        if ($rememberMe) {
+            setcookie('username', $username, time() + (86400 * 30), "/"); // Cookie expires in 30 days
+            setcookie('password', $password, time() + (86400 * 30), "/"); // Note: Storing plaintext passwords in cookies is not secure
+        } else {
+            // Clear cookies if not remembering the user
+            setcookie('username', '', time() - 3600, "/");
+            setcookie('password', '', time() - 3600, "/");
+        }
+
+        header('Location: index.php');
+        exit();
+    } else {
+        $error = 'Invalid credentials';
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="httpsstackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+
+<div class="login-container">
+    <h2 class="text-center">Login</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" class="form-control" placeholder="Username" value="<?php echo isset($_COOKIE['username']) ? htmlspecialchars($_COOKIE['username']) : ''; ?>" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-control" placeholder="Password" value="<?php echo isset($_COOKIE['password']) ? htmlspecialchars($_COOKIE['password']) : ''; ?>" required>
+        </div>
+        <div class="form-group form-check">
+            <input type="checkbox" id="remember_me" name="remember_me" class="form-check-input" <?php echo isset($_COOKIE['username']) ? 'checked' : ''; ?>>
+            <label for="remember_me" class="form-check-label">Remember Me</label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+        <?php if (isset($error)): ?>
+            <div class="alert alert-danger mt-3"><?php echo $error; ?></div>
+        <?php endif; ?>
+    </form>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
+
+
+                index.php
+              --------------
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+require 'db.php';
+require 'navbar.php'; // Include the navbar
+
+// Fetch metrics from the database
+$student_count_query = "SELECT COUNT(*) AS count FROM students";
+$student_count_result = mysqli_query($conn, $student_count_query);
+$student_count = mysqli_fetch_assoc($student_count_result)['count'];
+
+$user_count_query = "SELECT COUNT(*) AS count FROM users";
+$user_count_result = mysqli_query($conn, $user_count_query);
+$user_count = mysqli_fetch_assoc($user_count_result)['count'];
+?>
+
+<div class="container mt-4">
+    <h1>Dashboard</h1>
+    <div class="row">
+        <!-- Students Card -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-user-graduate fa-3x text-primary mr-3"></i> <!-- Font Awesome Icon -->
+                        <div>
+                            <h5 class="card-title">Total Students</h5>
+                            <p class="card-text"><?php echo htmlspecialchars($student_count); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Users Card -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-users fa-3x text-success mr-3"></i> <!-- Font Awesome Icon -->
+                        <div>
+                            <h5 class="card-title">Total Users</h5>
+                            <p class="card-text"><?php echo htmlspecialchars($user_count); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Add more metrics cards as needed -->
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
+
+
+
+                           add.student.php
+                       -------------------------
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+require 'db.php';
+require 'navbar.php'; // Include the navbar
+
+$errors = [];
+$first_name = $last_name = $dob = $email = $phone = '';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $first_name = trim($_POST['first_name']);
+    $last_name = trim($_POST['last_name']);
+    $dob = $_POST['dob'];
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+
+    // Validate input
+    if (empty($first_name) || empty($last_name)) {
+        $errors[] = "First name and last name are required.";
+    } elseif (!preg_match("/^[a-zA-Z-' ]+$/", $first_name) || !preg_match("/^[a-zA-Z-' ]+$/", $last_name)) {
+        $errors[] = "Names can only contain letters and whitespace.";
+    }
+
+
+
+    if (empty($dob)) {
+        $errors[] = "Date of birth is required.";
+    }
+    else{
+        $dob_timestamp = strtotime($dob);
+        if (!$dob_timestamp) {
+            $errors[] = "Invalid date format.";
+        } else {
+            $current_timestamp = time();
+            $max_age_timestamp = strtotime('-120 years');
+            if ($dob_timestamp >= $current_timestamp) {
+                $errors[] = "Date of birth cannot be today or in the future.";
+            } elseif ($dob_timestamp < $max_age_timestamp) {
+                $errors[] = "Date of birth cannot be more than 120 years ago.";
+            }
+        }
+    }
+ 
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) && !empty($email)) {
+        $errors[] = "Invalid email format.";
+    }
+
+    if (!preg_match('/^07[0-9]{8,10}$/', $phone) && !empty($phone)) {
+        $errors[] = "Phone number must start with '07' and be between 10 to 12 digits long.";
+    }
+
+    // Check email uniqueness
+    if (empty($errors)) {
+        $email_check_sql = "SELECT id FROM students WHERE email = '$email'";
+        $email_check_result = mysqli_query($conn, $email_check_sql);
+        if (mysqli_num_rows($email_check_result) > 0) {
+            $errors[] = "Email is already in use.";
+        }
+    }
+
+    // Perform insertion if no errors
+    if (empty($errors)) {
+        $sql_insert = "INSERT INTO students (first_name, last_name, dob, email, phone) 
+                       VALUES ('$first_name', '$last_name', '$dob', '$email', '$phone')";
+        if (mysqli_query($conn, $sql_insert)) {
+            header('Location: view_students.php');
+            exit();
+        } else {
+            $errors[] = 'Failed to add student: ' . mysqli_error($conn);
+        }
+    }
+}
+?>
+ <?php if (!empty($errors)): ?>
+        <div class="alert alert-danger mt-4">
+            <ul>
+                <?php foreach ($errors as $error): ?>
+                    <li><?php echo htmlspecialchars($error); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
+<div class="container mt-4">
+    <h1>Add New Student</h1>
+    <form method="POST">
+        <div class="form-group">
+            <label for="first_name">First Name</label>
+            <input type="text" id="first_name" name="first_name" class="form-control" value="<?php echo htmlspecialchars($first_name); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="last_name">Last Name</label>
+            <input type="text" id="last_name" name="last_name" class="form-control" value="<?php echo htmlspecialchars($last_name); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="dob">Date of Birth</label>
+            <input type="date" id="dob" name="dob" class="form-control" value="<?php echo htmlspecialchars($dob); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="text" id="email" name="email" class="form-control" value="<?php echo htmlspecialchars($email); ?>">
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone" class="form-control" value="<?php echo htmlspecialchars($phone); ?>">
+        </div>
+        <button type="submit" class="btn btn-primary">Add Student</button>
+    </form>
+
+   
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
+
+
+
+                  dbconnect.php
+                 ----------------
+<?php
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "student_management";
+
+$conn = mysqli_connect($servername, $username, $password, $dbname);
+
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
+}
+?>
+
+
+
+
+
+              delete.php
+            ---------------
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+require 'db.php';
+
+$student_id = $_GET['id'];
+$sql = "DELETE FROM students WHERE id = $student_id";
+
+if (mysqli_query($conn, $sql)) {
+    header('Location: view_students.php');
+    exit();
+} else {
+    echo 'Failed to delete student';
+}
+?>
+
+
+
+
+
+
+         logout.php
+       ---------------
+<?php
+session_start();
+session_destroy();
+header('Location: login.php');
+exit();
+?>
+
+
+          navbar.php
+        ---------------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Management System</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"> <!-- Font Awesome CDN -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="dashboard.php">Student Management System</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.php">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="view_students.php">View Students</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="add_student.php">Add Student</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="logout.php">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+    <div class="container mt-4">
+
+
+
+
+
+
+       edit stud.php
+      ----------------
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+require 'db.php';
+require 'navbar.php'; // Include the navbar
+
+$errors = [];
+$student_id = null;
+$first_name = $last_name = $dob = $email = $phone = '';
+$student = [];
+
+if (isset($_GET['id'])) {
+    $student_id = intval($_GET['id']);
+
+    // Fetch existing student data
+    $sql = "SELECT * FROM students WHERE id = $student_id";
+    $result = mysqli_query($conn, $sql);
+    if ($result) {
+        $student = mysqli_fetch_assoc($result);
+        $first_name = $student['first_name'];
+        $last_name = $student['last_name'];
+        $dob = $student['dob'];
+        $email = $student['email'];
+        $phone = $student['phone'];
+    } else {
+        die('Error fetching student data');
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $first_name = trim($_POST['first_name']);
+    $last_name = trim($_POST['last_name']);
+    $dob = $_POST['dob'];
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+
+    // Validate input
+    if (empty($first_name) || empty($last_name)) {
+        $errors[] = "First name and last name are required.";
+    } elseif (!preg_match("/^[a-zA-Z-' ]+$/", $first_name) || !preg_match("/^[a-zA-Z-' ]+$/", $last_name)) {
+        $errors[] = "Names can only contain letters and whitespace.";
+    }
+
+  
+    if (empty($dob)) {
+        $errors[] = "Date of birth is required.";
+    }
+    else{
+        $dob_timestamp = strtotime($dob);
+        if (!$dob_timestamp) {
+            $errors[] = "Invalid date format.";
+        } else {
+            $current_timestamp = time();
+            $max_age_timestamp = strtotime('-120 years');
+            if ($dob_timestamp >= $current_timestamp) {
+                $errors[] = "Date of birth cannot be today or in the future.";
+            } elseif ($dob_timestamp < $max_age_timestamp) {
+                $errors[] = "Date of birth cannot be more than 120 years ago.";
+            }
+        }
+    }
+ 
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) && !empty($email)) {
+        $errors[] = "Invalid email format.";
+    }
+
+    if (!preg_match('/^07[0-9]{8,10}$/', $phone) && !empty($phone)) {
+        $errors[] = "Phone number must start with '07' and be between 10 to 12 digits long.";
+    }
+
+    // Check email uniqueness
+    if (empty($errors)) {
+        $email_check_sql = "SELECT id FROM students WHERE email = '$email' AND id != $student_id";
+        $email_check_result = mysqli_query($conn, $email_check_sql);
+        if (mysqli_num_rows($email_check_result) > 0) {
+            $errors[] = "Email is already in use.";
+        }
+    }
+
+    // Perform update if no errors
+    if (empty($errors)) {
+        $sql_update = "UPDATE students 
+                       SET first_name = '$first_name', 
+                           last_name = '$last_name', 
+                           dob = '$dob', 
+                           email = '$email', 
+                           phone = '$phone' 
+                       WHERE id = $student_id";
+        if (mysqli_query($conn, $sql_update)) {
+            header('Location: view_students.php');
+            exit();
+        } else {
+            $errors[] = 'Failed to update student: ' . mysqli_error($conn);
+        }
+    }
+}
+?>
+
+<?php if (!empty($errors)): ?>
+        <div class="alert alert-danger mt-4">
+            <ul>
+                <?php foreach ($errors as $error): ?>
+                    <li><?php echo htmlspecialchars($error); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
+
+<div class="container mt-4">
+    <h1>Edit Student</h1>
+    <form method="POST">
+        <div class="form-group">
+            <label for="first_name">First Name</label>
+            <input type="text" id="first_name" name="first_name" class="form-control" value="<?php echo htmlspecialchars($first_name); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="last_name">Last Name</label>
+            <input type="text" id="last_name" name="last_name" class="form-control" value="<?php echo htmlspecialchars($last_name); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="dob">Date of Birth</label>
+            <input type="date" id="dob" name="dob" class="form-control" value="<?php echo htmlspecialchars($dob); ?>" >
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="text" id="email" name="email" class="form-control" value="<?php echo htmlspecialchars($email); ?>">
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone" class="form-control" value="<?php echo htmlspecialchars($phone); ?>">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Student</button>
+    </form>
+
+   
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+            display.php
+           -------------
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+require 'db.php';
+require 'navbar.php'; // Include the navbar
+
+$sql = "SELECT * FROM students";
+$result = mysqli_query($conn, $sql);
+?>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>DOB</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php while ($row = mysqli_fetch_assoc($result)): ?>
+            <tr>
+                <td><?php echo htmlspecialchars($row['id']); ?></td>
+                <td><?php echo htmlspecialchars($row['first_name']); ?></td>
+                <td><?php echo htmlspecialchars($row['last_name']); ?></td>
+                <td><?php echo htmlspecialchars($row['dob']); ?></td>
+                <td><?php echo htmlspecialchars($row['email']); ?></td>
+                <td><?php echo htmlspecialchars($row['phone']); ?></td>
+                <td>
+                <a href="edit_student.php?id=<?php echo htmlspecialchars($row['id']); ?>" class="btn btn-warning">
+    <i class="fas fa-edit"></i> Edit
+</a>
+<a href="delete_student.php?id=<?php echo htmlspecialchars($row['id']); ?>" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this student?');">
+    <i class="fas fa-trash-alt"></i> Delete
+</a>
+                </td>
+            </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
+
+</div> <!-- Close the container -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
+
